@@ -1,0 +1,137 @@
+---
+title: "Statistical inference with the GSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+```
+
+### Load data
+
+Make sure your data and R Markdown files are in the same directory. When loaded
+your data file will be called `gss`. Delete this note when before you submit 
+your work. 
+
+```{r load-data}
+load("/Users/hereagain/Downloads/_5db435f06000e694f6050a2d43fc7be3_gss.Rdata")
+```
+
+
+
+* * *
+
+## Part 1: Data
+The General Social Survey (GSS) is a nationally representative survey of adults in the United States conducted since 1972.   
+  
+### how is collected:   
+According to the gss website,the GSS survey is conducted face-to-face with an in-person interview by NORC at the University of Chicago. Respondents are random sampled from a mix of urban, suburban, and rural geographic areas. Participation in the study is strictly voluntary.  
+
+### Generalizability / Causality  
+The sample data should allow us to generalize to the population of interest.
+However, there is no causation can be established as GSS is an observation study that can only establish correlation/association between variables. In addition, potential biases are associated with non-response because this is a voluntary in-person survey that takes approximately 90 minutes. Some potential respondents may choose not to participate.
+
+
+* * *
+
+## Part 2: Research question
+**Question:** Is there any difference of unempolyment rate for past 10 years between Black and White people? 
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+NOTE: Insert code chunks as needed by clicking on the "Insert a new code chunk" 
+button (green button with orange arrow) above. Make sure that your code is visible
+in the project you submit. Delete this note when before you submit your work.
+
+
+```{r}
+#Remove nas, and get the data we want
+employ=gss%>%
+  select(race, unemp)%>%filter(unemp %in% c("Yes","No")&race!="Other")
+nrow(employ)
+```
+After filtering the peopel in other races and with na documentation about employments status, there are 33917 people in our final sample.
+```{r}
+
+table=employ%>%group_by(race,unemp)%>%
+  summarise(count=n())
+table
+his=ggplot(table,aes(x=race,y=count,fill=unemp))+
+  geom_bar(stat = "identity",position=position_dodge())
+his+scale_fill_brewer(palette = "Dark2")+
+  ggtitle("people of unemployment in difference races")
+
+
+```
+From this figure, the  amount of people that have jobs are far more than people under unemployment.
+
+* * *
+
+## Part 4: Inference
+State Hypothesis:
+Null Hypothesis: the unemployment rates for the past ten years are equal in White and Black people. 
+Alternative Hypothesis: The umemployment of White people is not equal to that of Black people.
+
+```{r}
+pwhite=8636/(8636+20905)
+pblack=1710/(1710+2666)
+pooled<-(1710+8636)/(sum(table$count))
+#for White people, there are at least 10 failures and success
+pooled*(8636+20905)
+(1-pooled)*(8636+20905)
+#for Black people, there are at least 10 failures and success
+pooled*(1710+2666)
+(1-pooled)*(1710+2666)
+
+```
+
+### Check conditions  
+The survey respondents were random sampled, we can assume the independence.
+If sampling without replacement, n < 10% of population. The 33917 observations met this requirement.
+
+### Sample size  
+At least 10 success and 10 failures in the sample. According to the calculation above, this sample meet the requirement.
+
+### Perform inference  
+**method1**
+```{r}
+SE=sqrt(pooled*(1-pooled)/(8636+20905)+pooled*(1-pooled)/(1710+2666))
+z_statisc=(pblack-pwhite)/SE
+pnorm(z_statisc,lower.tail = F)
+```
+With a small p vaalue, we have enough evidence to reject our null hypothesis,
+confidence interval 
+```{r}
+se=sqrt(pblack*(1-pblack)/(1710+2666)+pwhite*(1-pwhite)/(8636+20905))
+ci=(pblack-pwhite)+c(-1,1)*1.96*se
+ci
+```
+The 95% confiende interval is (0.083,0.114), Since the interval does not contain 0, we see that the difference seen in this study was "significant."
+
+**method 2** 
+```{r}
+source("http://bit.ly/dasi_inference")
+black=subset(employ,race=="Black")
+inference(y = black$unemp, est = "proportion", type = "ci",
+          method = "theoretical", success = "Yes")
+
+white=subset(employ,race=="White")
+inference(y = white$unemp, est = "proportion", type = "ci",
+          method = "theoretical", success = "Yes")
+```
+According to the confidence intervals calculated above, they don't overlap with each other, which suggested the unemployment between this two race is significantly different. 
+
+### Interpret results  
+With such a small P value,  We are 95% confident that the employment rates between Black people and White people are different, aand We reject null hypothesis in favor of alternative hypothesis. The 95% confidence interval of difference goes from 0.083 to 0.114,Since the interval does not contain 0, we see that the difference seen in this study was "significant."
